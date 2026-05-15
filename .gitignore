@@ -9,6 +9,7 @@ __pycache__/
 
 # Datasets (Too large for GitHub)
 dataset/
+*.csv
 
 # Model outputs and heavy binaries
 outputs/
