@@ -1,0 +1,23 @@
+# Virtual Environments
+venv/
+env/
+.env
+
+# Python Cache
+__pycache__/
+*.pyc
+
+# Datasets (Too large for GitHub)
+dataset/
+*.csv
+
+# Model outputs and heavy binaries
+outputs/
+sigma_module/outputs/
+*.pkl
+*.model
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
