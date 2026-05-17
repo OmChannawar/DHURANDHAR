@@ -14,10 +14,7 @@ st.set_page_config(
 st.markdown("""
     <style>
     /* Force pure white background and remove Streamlit's dark mode defaults */
-    [data-testid="stAppViewContainer"] {
-        background-color: #FFFFFF !important;
-    }
-    [data-testid="stHeader"] {
+    [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
         background-color: #FFFFFF !important;
     }
     .stApp {
@@ -65,7 +62,6 @@ st.markdown("""
 
 # --- UI Helper Functions ---
 def generate_meter_html(results):
-    """Generates the visual scoreboard with gauge/speedometer charts."""
     html = '<div style="display: flex; flex-direction: column; gap: 1rem;">'
     for r in results:
         prob = r['probability']
@@ -107,7 +103,6 @@ def generate_meter_html(results):
 
 
 def generate_metrics_html(avg_prob, final_label):
-    """Generates the styled bottom score summary."""
     if final_label == "Real":
         color = "#16A34A"
         bg = "#F0FDF4"
@@ -136,22 +131,28 @@ def generate_metrics_html(avg_prob, final_label):
 
 
 def main():
+    # Session State Initialization
     if "prediction_results" not in st.session_state:
         st.session_state.prediction_results = None
+    if "is_analyzing" not in st.session_state:
+        st.session_state.is_analyzing = False
+    if "current_text" not in st.session_state:
+        st.session_state.current_text = ""
 
     # --- 1. TITLE SECTION (HERO HEADER) ---
+    # Fixed CSS text-fill bug causing title to be invisible
     st.markdown("""
     <div style="text-align: center; margin-top: 1rem; margin-bottom: 4rem;">
         <h1 style="
             font-size: 4.5rem; 
             font-weight: 900; 
             font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #1E3A8A 0%, #7C3AED 100%); 
-            -webkit-background-clip: text; 
-            -webkit-text-fill-color: transparent; 
+            color: transparent;
+            background-image: linear-gradient(135deg, #1E3A8A 0%, #7C3AED 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
             letter-spacing: 0.15em;
-            margin-bottom: 0;
-            text-shadow: 0px 4px 25px rgba(124, 58, 237, 0.2);">
+            margin: 0;">
             DHURANDHAR
         </h1>
         <h3 style="color: #64748B; font-style: italic; font-weight: 400; margin-top: 0.5rem; margin-bottom: 0.5rem; font-size: 1.4rem;">
@@ -168,11 +169,11 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
-    # --- SIDE-BY-SIDE DASHBOARD LAYOUT ---
-    col1, col2 = st.columns([1, 1.3], gap="large")
+    # --- TRUE TWO-COLUMN DASHBOARD LAYOUT ---
+    left_col, right_col = st.columns([1, 1.2], gap="large")
 
     # --- 2. LEFT PANEL (INPUT AREA) ---
-    with col1:
+    with left_col:
         news_text = st.text_area(
             "News Content:", 
             height=300, 
@@ -184,72 +185,170 @@ def main():
         analyze_btn = st.button("⚡ PREDICT", use_container_width=True)
         st.markdown("<p style='text-align: center; color: #94A3B8; font-size: 0.85rem; margin-top: 0.5rem;'>🔒 Your text is used only for prediction.</p>", unsafe_allow_html=True)
 
+        # Trigger prediction logic
+        if analyze_btn:
+
+            if not news_text.strip():
+                st.error(
+                    "Text payload empty. "
+                    "Please enter content to proceed."
+                )
+
+            else:
+                # Save text
+                st.session_state.current_text = (
+                    news_text
+                )
+
+                # Reset previous results
+                st.session_state.prediction_results = None
+
+                # Start analysis
+                st.session_state.is_analyzing = True
+
+                # IMPORTANT:
+                # force rerender immediately
+                st.rerun()
+
     # --- 3. RIGHT PANEL (MODEL SCOREBOARD) ---
-    with col2:
-        # Placeholders for dynamic content updating
-        progress_bar = st.empty()
-        status_text = st.empty()
+    with right_col:
+
+        # Persistent placeholders
         scoreboard_placeholder = st.empty()
         metrics_placeholder = st.empty()
-        
-        # Action triggered by Predict button
-        if analyze_btn:
-            if not news_text.strip():
-                st.error("Text payload empty. Please enter content to proceed.")
-            else:
-                st.session_state.prediction_results = None # Clear previous
-                with st.spinner("Analyzing article..."):
-                    pb = progress_bar.progress(0)
-                    status_text.markdown("<p style='color: #3B82F6; font-weight: 600; font-size: 0.95rem; text-align: center;'>Activating AI Engines...</p>", unsafe_allow_html=True)
-                    
-                    total_expected_models = 5 # KNN, SVM, AdaBoost, XGBoost, Gradient Boosting
-                    
-                    # DYNAMIC ANIMATION: Loop through the generator as models yield results
-                    for i, data in enumerate(predict_all_models(news_text)):
-                        
-                        # Increment progress
-                        current_count = i + 1
-                        progress_pct = min(100, int((current_count / total_expected_models) * 100))
-                        pb.progress(progress_pct)
-                        
-                        # Save state
-                        st.session_state.prediction_results = data
-                        
-                        # Update Scoreboard Live
-                        meter_html = generate_meter_html(st.session_state.prediction_results["results"])
-                        scoreboard_placeholder.markdown(meter_html, unsafe_allow_html=True)
-                        
-                        # Update Metrics Live
-                        metrics_html = generate_metrics_html(st.session_state.prediction_results["average_probability"], st.session_state.prediction_results["final_label"])
-                        metrics_placeholder.markdown(metrics_html, unsafe_allow_html=True)
-                        
-                        # Smooth animation delay
-                        time.sleep(0.5)
-                        
-                    # Clean up statuses upon finish
-                    status_text.empty()
-                    progress_bar.empty()
+        progress_placeholder = st.empty()
+        status_placeholder = st.empty()
 
-        # Render persisted results if not actively predicting
-        if st.session_state.prediction_results is not None and not analyze_btn:
-            data = st.session_state.prediction_results
-            meter_html = generate_meter_html(data["results"])
-            scoreboard_placeholder.markdown(meter_html, unsafe_allow_html=True)
-            
-            metrics_html = generate_metrics_html(data["average_probability"], data["final_label"])
-            metrics_placeholder.markdown(metrics_html, unsafe_allow_html=True)
-            
-        elif st.session_state.prediction_results is None and not analyze_btn:
-            # Initial empty state card
-            scoreboard_placeholder.markdown("""
-            <div style="padding: 60px 40px; text-align: center; border: 1px solid #E2E8F0; border-radius: 16px; background: #FFFFFF; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
-                <div style="width: 48px; height: 48px; margin: 0 auto 16px auto; background: #F8FAFC; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-                    <span style="font-size: 24px;">📊</span>
+        # --------------------------
+        # ACTIVE ANALYSIS STATE
+        # --------------------------
+        if st.session_state.is_analyzing:
+
+            progress_bar = progress_placeholder.progress(0)
+
+            status_placeholder.markdown(
+                """
+                <div style="
+                    text-align:center;
+                    color:#3B82F6;
+                    font-weight:600;
+                    margin-bottom:15px;
+                ">
+                🤖 Activating AI Engines...
                 </div>
-                <h4 style="margin: 0; color: #1E293B; font-weight: 700; font-size: 1.2rem;">Model Scoreboard</h4>
-                <p style="margin-top: 8px; font-size: 0.95rem; color: #64748B;">Enter text and click predict to see live AI analysis.</p>
+                """,
+                unsafe_allow_html=True
+            )
+
+            total_models = 5
+
+            for i, data in enumerate(
+                predict_all_models(
+                    st.session_state.current_text
+                )
+            ):
+
+                # Save results
+                st.session_state.prediction_results = data
+
+                # Update progress
+                progress = int(
+                    ((i + 1) / total_models) * 100
+                )
+
+                progress_bar.progress(progress)
+
+                # IMPORTANT:
+                # render into placeholders
+                scoreboard_placeholder.markdown(
+                    generate_meter_html(
+                        data["results"]
+                    ),
+                    unsafe_allow_html=True
+                )
+
+                metrics_placeholder.markdown(
+                    generate_metrics_html(
+                        data["average_probability"],
+                        data["final_label"]
+                    ),
+                    unsafe_allow_html=True
+                )
+
+                time.sleep(0.5)
+
+            # cleanup
+            progress_placeholder.empty()
+            status_placeholder.empty()
+
+            st.session_state.is_analyzing = False
+            st.rerun()
+
+        # --------------------------
+        # SHOW SAVED RESULTS
+        # --------------------------
+        elif st.session_state.prediction_results is not None:
+
+            data = (
+                st.session_state.prediction_results
+            )
+
+            scoreboard_placeholder.markdown(
+                generate_meter_html(
+                    data["results"]
+                ),
+                unsafe_allow_html=True
+            )
+
+            metrics_placeholder.markdown(
+                generate_metrics_html(
+                    data["average_probability"],
+                    data["final_label"]
+                ),
+                unsafe_allow_html=True
+            )
+
+        # --------------------------
+        # EMPTY STATE
+        # --------------------------
+        else:
+
+            scoreboard_placeholder.markdown(
+                """
+                <div style="
+                    padding:60px;
+                    border:1px solid #E2E8F0;
+                    border-radius:20px;
+                    text-align:center;
+                    background:white;
+                    box-shadow:
+                    0 4px 12px
+                    rgba(0,0,0,0.06);
+                ">
+                <div style="
+                    font-size:40px;
+                    margin-bottom:10px;
+                ">
+                    📊
+                </div>
+
+                <h3 style="
+                    color:#0F172A;
+                    margin-bottom:8px;
+                ">
+                    Model Scoreboard
+                </h3>
+
+                <p style="
+                    color:#64748B;
+                ">
+                    Prediction scoreboard
+                    will appear here
+                </p>
             </div>
-            """, unsafe_allow_html=True)
+            """,
+            unsafe_allow_html=True
+        )
 
 if __name__ == "__main__":
     main()

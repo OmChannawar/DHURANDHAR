@@ -2,107 +2,267 @@ import os
 import joblib
 import numpy as np
 
+
+# -------------------------------
+# MODEL PATH HELPER
+# -------------------------------
 def get_model_path(model_name):
     """
-    Helper function to map the model name to the .pkl file path.
+    Maps model names to .pkl files.
     """
-    model_filenames = {
-        "KNN": "knn_pipeline.pkl",
-        "SVM": "svm_pipeline.pkl",
-        "AdaBoost": "adaboost_pipeline.pkl",
-        "XGBoost": "xgboost_pipeline.pkl",
-        "Gradient Boosting": "gradient_boosting_pipeline.pkl" 
-    }
-    filename = model_filenames.get(model_name)
-    if not filename:
-        return None
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    return os.path.abspath(os.path.join(base_dir, "..", "models", filename))
 
+    model_filenames = {
+        "KNN": "knn_model.pkl",
+        "SVM": "svm_model.pkl",
+        "AdaBoost": "adaboost_model.pkl",
+        "XGBoost": "xgboost_model.pkl",
+        "Gradient Boosting": "gradient_boosting_model.pkl"
+    }
+
+    filename = model_filenames.get(model_name)
+
+    if not filename:
+        raise ValueError(
+            f"Model '{model_name}' not found."
+        )
+
+    base_dir = os.path.dirname(
+        os.path.abspath(__file__)
+    )
+
+    filepath = os.path.abspath(
+        os.path.join(
+            base_dir,
+            "..",
+            "models",
+            filename
+        )
+    )
+
+    return filepath
+
+
+# -------------------------------
+# LOAD MODEL
+# -------------------------------
 def load_model(model_name):
     """
-    Loads the pipeline model via joblib.
+    Loads sklearn pipeline model.
     """
+
     filepath = get_model_path(model_name)
-    if not filepath or not os.path.exists(filepath):
-        return None
-    return joblib.load(filepath)
 
-def format_label(pred):
+    if not os.path.exists(filepath):
+        raise FileNotFoundError(
+            f"Missing model file: {filepath}"
+        )
+
+    model = joblib.load(filepath)
+
+    return model
+
+
+# -------------------------------
+# LABEL MAPPING
+# -------------------------------
+def map_prediction_label(raw_prediction):
     """
-    Safely normalizes outputs into clean 'Real' or 'Fake' strings,
-    independent of how models were initially label-encoded.
+    Robust label mapping.
+    Handles:
+    0/1
+    Fake/Real
+    False/True
     """
-    val = str(pred).strip().upper()
-    if val in ['1', '1.0', 'REAL', 'TRUE']:
+
+    pred_str = str(
+        raw_prediction
+    ).strip().upper()
+
+    if pred_str in [
+        "1",
+        "1.0",
+        "REAL",
+        "TRUE"
+    ]:
         return "Real"
-    elif val in ['0', '0.0', 'FAKE', 'FALSE']:
-        return "Fake"
-    return str(pred).title()
 
+    elif pred_str in [
+        "0",
+        "0.0",
+        "FAKE",
+        "FALSE"
+    ]:
+        return "Fake"
+
+    return str(raw_prediction)
+
+
+# -------------------------------
+# GET CONFIDENCE
+# -------------------------------
+def get_confidence(
+    model,
+    text,
+    raw_prediction
+):
+    """
+    Extract confidence safely
+    using predict_proba.
+    """
+
+    confidence = 100.0
+
+    if hasattr(model, "predict_proba"):
+
+        probabilities = (
+            model.predict_proba([text])[0]
+        )
+
+        if hasattr(model, "classes_"):
+
+            classes_list = list(
+                model.classes_
+            )
+
+            if raw_prediction in classes_list:
+
+                class_index = (
+                    classes_list.index(
+                        raw_prediction
+                    )
+                )
+
+                confidence = float(
+                    probabilities[
+                        class_index
+                    ]
+                ) * 100
+
+            else:
+                confidence = (
+                    float(
+                        np.max(probabilities)
+                    ) * 100
+                )
+
+        else:
+            confidence = (
+                float(
+                    np.max(probabilities)
+                ) * 100
+            )
+
+    return confidence
+
+
+# -------------------------------
+# MAIN PREDICTION ENGINE
+# -------------------------------
 def predict_all_models(text):
     """
-    Generator that evaluates the text against all models sequentially.
-    Yields a dictionary with the accumulated results so far, enabling 
-    live, real-time UI updates as each model finishes processing.
+    Generator function.
+
+    Yields results progressively
+    for Streamlit animation.
     """
-    model_names = [
-        "KNN", "SVM", "AdaBoost", "XGBoost", "Gradient Boosting"
+
+    model_order = [
+        "KNN",
+        "SVM",
+        "AdaBoost",
+        "XGBoost",
+        "Gradient Boosting"
     ]
-    
+
     results = []
-    
-    for model_name in model_names:
+
+    for model_name in model_order:
+
         try:
-            model = load_model(model_name)
-            if not model:
-                continue
-            
-            # 1. Pipeline inference
-            pred = model.predict([text])[0]
-            
-            # 2. Probability extraction mapping via classes_
-            confidence = 100.0
-            if hasattr(model, "predict_proba"):
-                proba = model.predict_proba([text])[0]
-                if hasattr(model, "classes_"):
-                    classes = list(model.classes_)
-                    if pred in classes:
-                        idx = classes.index(pred)
-                        confidence = float(proba[idx]) * 100
-                    else:
-                        confidence = float(np.max(proba)) * 100
-                else:
-                    confidence = float(np.max(proba)) * 100
-            
-            label_str = format_label(pred)
-            
+            # Load model
+            model = load_model(
+                model_name
+            )
+
+            # Predict
+            raw_prediction = (
+                model.predict([text])[0]
+            )
+
+            # Label mapping
+            label = (
+                map_prediction_label(
+                    raw_prediction
+                )
+            )
+
+            # Confidence
+            confidence = (
+                get_confidence(
+                    model,
+                    text,
+                    raw_prediction
+                )
+            )
+
+            # Save result
             results.append({
                 "model": model_name,
-                "label": label_str,
+                "label": label,
                 "probability": confidence
             })
-            
-            # 3. Calculate running metrics
-            avg_prob = sum(r["probability"] for r in results) / len(results)
-            real_count = sum(1 for r in results if r["label"] == "Real")
-            fake_count = sum(1 for r in results if r["label"] == "Fake")
-            
-            # 4. Ensemble Majority Vote
-            if real_count > fake_count:
-                final_label = "Real"
-            elif fake_count > real_count:
-                final_label = "Fake"
-            else:
-                final_label = "Tie"
-                
-            # Yield structure exactly as requested
-            yield {
-                "results": results,
-                "average_probability": avg_prob,
-                "final_label": final_label
+
+            # ----------------
+            # MAJORITY VOTE
+            # ----------------
+            real_votes = sum(
+                1
+                for r in results
+                if r["label"] == "Real"
+            )
+
+            fake_votes = sum(
+                1
+                for r in results
+                if r["label"] == "Fake"
+            )
+
+            final_label = (
+                "Real"
+                if real_votes >= fake_votes
+                else "Fake"
+            )
+
+            # ----------------
+            # AVG CONFIDENCE
+            # ----------------
+            avg_probability = (
+                sum(
+                    r["probability"]
+                    for r in results
+                )
+                / len(results)
+            )
+
+            data = {
+                "results": results.copy(),
+                "average_probability":
+                    avg_probability,
+                "final_label":
+                    final_label
             }
-            
+
+            print(
+                "Yielding:",
+                data
+            )
+
+            # IMPORTANT:
+            # progressive updates
+            yield data
+
         except Exception as e:
-            print(f"Skipping {model_name} due to error: {e}")
-            continue
+            print(
+                f"Error in "
+                f"{model_name}: {e}"
+            )
