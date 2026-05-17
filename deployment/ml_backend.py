@@ -7,15 +7,11 @@ def get_model_path(model_name):
     Helper function to map the model name to the .pkl file path.
     """
     model_filenames = {
-        "Logistic Regression": "logistic_regression_model.pkl",
-        "KNN": "knn_model.pkl",
-        "SVM": "svm_model.pkl",
-        "Decision Tree": "decision_tree_model.pkl",
-        "Naive Bayes": "naive_bayes_model.pkl",
-        "Random Forest": "random_forest_model.pkl",
-        "AdaBoost": "adaboost_model.pkl",
-        "Gradient Boosting": "gradient_boosting_model.pkl",
-        "XGBoost": "xgboost_model.pkl"
+        "KNN": "knn_pipeline.pkl",
+        "SVM": "svm_pipeline.pkl",
+        "AdaBoost": "adaboost_pipeline.pkl",
+        "XGBoost": "xgboost_pipeline.pkl",
+        "Gradient Boosting": "gradient_boosting_pipeline.pkl" 
     }
     filename = model_filenames.get(model_name)
     if not filename:
@@ -51,9 +47,7 @@ def predict_all_models(text):
     live, real-time UI updates as each model finishes processing.
     """
     model_names = [
-        "Logistic Regression", "KNN", "SVM", "Decision Tree", 
-        "Naive Bayes", "Random Forest", "AdaBoost", 
-        "Gradient Boosting", "XGBoost"
+        "KNN", "SVM", "AdaBoost", "XGBoost", "Gradient Boosting"
     ]
     
     results = []

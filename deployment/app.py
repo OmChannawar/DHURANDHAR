@@ -1,196 +1,255 @@
 import streamlit as st
 import time
-import pandas as pd
 from ml_backend import predict_all_models
 
 # --- Page Config ---
 st.set_page_config(
     page_title="DHURANDHAR | Live AI Analysis",
     page_icon="📰",
-    layout="wide",  # Wide layout for side-by-side dashboard capability
+    layout="wide",
     initial_sidebar_state="collapsed"
 )
 
 # --- Custom CSS Theme ---
 st.markdown("""
     <style>
+    /* Force pure white background and remove Streamlit's dark mode defaults */
+    [data-testid="stAppViewContainer"] {
+        background-color: #FFFFFF !important;
+    }
+    [data-testid="stHeader"] {
+        background-color: #FFFFFF !important;
+    }
     .stApp {
-        background-color: #FFFFFF;
-        color: #1E293B;
+        background-color: #FFFFFF !important;
+        color: #1E293B !important;
     }
     
     /* Input Text Area Customization */
     .stTextArea textarea {
-        background-color: #F8FAFC !important;
-        border: 1px solid #E2E8F0 !important;
-        border-radius: 8px !important;
+        background-color: #FFFFFF !important;
+        border: 2px solid #E2E8F0 !important;
+        border-radius: 12px !important;
         color: #0F172A !important;
-        padding: 1rem !important;
+        padding: 1.5rem !important;
+        font-size: 1.05rem !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important;
+        transition: all 0.3s ease;
     }
-    
     .stTextArea textarea:focus {
         border-color: #3B82F6 !important;
-        box-shadow: 0 0 0 1px #3B82F6 !important;
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1) !important;
+    }
+
+    /* Custom Predict Button */
+    div.stButton > button {
+        background: linear-gradient(135deg, #2563EB 0%, #8B5CF6 100%) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 12px !important;
+        padding: 0.75rem 2rem !important;
+        font-weight: 700 !important;
+        font-size: 1.1rem !important;
+        letter-spacing: 0.05em !important;
+        box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3) !important;
+        transition: all 0.3s ease !important;
+        width: 100% !important;
+    }
+    div.stButton > button:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4) !important;
     }
     </style>
 """, unsafe_allow_html=True)
 
 
 # --- UI Helper Functions ---
-def generate_table_html(results):
-    """Generates the modern live-updating Prediction Table with integrated progress bars."""
-    html = """
-    <table style="width:100%; border-collapse: collapse; text-align: left; font-family: 'Inter', sans-serif; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1); border-radius: 8px; overflow: hidden;">
-        <tr style="background-color: #F8FAFC; border-bottom: 1px solid #E2E8F0;">
-            <th style="padding: 14px 16px; color: #475569; font-weight: 600; font-size: 0.9rem; text-transform: uppercase;">Model Engine</th>
-            <th style="padding: 14px 16px; color: #475569; font-weight: 600; font-size: 0.9rem; text-transform: uppercase;">Prediction</th>
-            <th style="padding: 14px 16px; color: #475569; font-weight: 600; font-size: 0.9rem; text-transform: uppercase;">Probability</th>
-        </tr>
-    """
-    for idx, r in enumerate(results):
-        bg_color = "#FFFFFF" if idx % 2 == 0 else "#F8FAFC"
-        color = "#16A34A" if r["label"] == "Real" else "#DC2626"
+def generate_meter_html(results):
+    """Generates the visual scoreboard with gauge/speedometer charts."""
+    html = '<div style="display: flex; flex-direction: column; gap: 1rem;">'
+    for r in results:
+        prob = r['probability']
+        label = r['label']
+        model = r['model']
+        
+        # Color logic
+        if label == "Real":
+            color = "#16A34A" # Green for real
+        elif label == "Fake":
+            color = "#DC2626" # Red for fake
+        else:
+            color = "#64748B"
+            
+        # Override for moderate confidence
+        if 40 <= prob < 75:
+            color = "#F59E0B" # Orange
+            
+        dash_array = 125.6
+        dash_offset = dash_array - (dash_array * prob / 100)
+        
         html += f"""
-        <tr style="background-color: {bg_color}; border-bottom: 1px solid #F1F5F9;">
-            <td style="padding: 12px 16px; color: #1E293B; font-weight: 500;">{r['model']}</td>
-            <td style="padding: 12px 16px; font-weight: 800; color: {color};">{r['label']}</td>
-            <td style="padding: 12px 16px; color: #334155;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <div style="flex-grow: 1; background: #E2E8F0; border-radius: 4px; height: 6px; overflow: hidden;">
-                        <div style="width: {r['probability']}%; background: {color}; height: 100%;"></div>
-                    </div>
-                    <span style="min-width: 45px; font-size: 0.9rem; font-weight: 500;">{r['probability']:.1f}%</span>
-                </div>
-            </td>
-        </tr>
+        <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); display: flex; align-items: center; justify-content: space-between;">
+            <div>
+                <h4 style="margin: 0; color: #1E293B; font-size: 1.1rem; font-weight: 700;">{model}</h4>
+                <p style="margin: 4px 0 0 0; color: {color}; font-weight: 800; font-size: 0.95rem; text-transform: uppercase;">{label}</p>
+            </div>
+            <div style="width: 120px; text-align: center;">
+                <svg viewBox="0 0 100 55" style="width: 100%; display: block; margin: 0 auto; overflow: visible;">
+                    <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="#F1F5F9" stroke-width="8" stroke-linecap="round"></path>
+                    <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="{color}" stroke-width="8" stroke-linecap="round" stroke-dasharray="{dash_array}" stroke-dashoffset="{dash_offset}" style="transition: stroke-dashoffset 1s ease-out;"></path>
+                    <text x="50" y="45" font-family="'Inter', sans-serif" font-size="16" font-weight="800" fill="#1E293B" text-anchor="middle">{prob:.1f}%</text>
+                </svg>
+            </div>
+        </div>
         """
-    html += "</table>"
+    html += '</div>'
     return html
 
 
 def generate_metrics_html(avg_prob, final_label):
-    """Generates the styled KPI cards for Average Probability and the Final Decision."""
+    """Generates the styled bottom score summary."""
     if final_label == "Real":
         color = "#16A34A"
-        bg = "#DCFCE7"
-        border = "#bbf7d0"
+        bg = "#F0FDF4"
+        border = "#BBF7D0"
     elif final_label == "Fake":
         color = "#DC2626"
-        bg = "#FEE2E2"
-        border = "#fecaca"
+        bg = "#FEF2F2"
+        border = "#FECACA"
     else:
         color = "#475569"
-        bg = "#F1F5F9"
-        border = "#e2e8f0"
+        bg = "#F8FAFC"
+        border = "#E2E8F0"
 
     return f"""
-    <div style="display: flex; gap: 20px; margin-top: 24px;">
-        <div style="flex: 1; padding: 24px; background: {bg}; border-radius: 12px; border: 1px solid {border}; text-align: center; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
-            <div style="color: {color}; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Final Ensemble Decision</div>
-            <div style="color: {color}; font-size: 2.2rem; font-weight: 800; margin-top: 8px;">{final_label.upper()}</div>
+    <div style="display: flex; gap: 20px; margin-top: 1.5rem;">
+        <div style="flex: 1; padding: 20px; background: #FFFFFF; border-radius: 12px; border: 1px solid #E2E8F0; text-align: center; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+            <div style="color: #64748B; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Average Confidence</div>
+            <div style="color: #1E293B; font-size: 2rem; font-weight: 800; margin-top: 4px;">{avg_prob:.1f}%</div>
         </div>
-        <div style="flex: 1; padding: 24px; background: #F8FAFC; border-radius: 12px; border: 1px solid #E2E8F0; text-align: center; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
-            <div style="color: #64748B; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Average Confidence</div>
-            <div style="color: #0F172A; font-size: 2.2rem; font-weight: 800; margin-top: 8px;">{avg_prob:.1f}%</div>
+        <div style="flex: 1; padding: 20px; background: {bg}; border-radius: 12px; border: 1px solid {border}; text-align: center; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+            <div style="color: {color}; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Final Prediction</div>
+            <div style="color: {color}; font-size: 2rem; font-weight: 900; margin-top: 4px;">{final_label.upper()} NEWS</div>
         </div>
     </div>
     """
 
 
 def main():
-    # --- HERO HEADER (DHURANDHAR Branding) ---
+    if "prediction_results" not in st.session_state:
+        st.session_state.prediction_results = None
+
+    # --- 1. TITLE SECTION (HERO HEADER) ---
     st.markdown("""
-    <div style="text-align: center; margin-top: 1rem; margin-bottom: 3.5rem;">
+    <div style="text-align: center; margin-top: 1rem; margin-bottom: 4rem;">
         <h1 style="
-            font-size: 4rem; 
+            font-size: 4.5rem; 
             font-weight: 900; 
-            background: linear-gradient(135deg, #2563EB 0%, #06B6D4 100%); 
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #1E3A8A 0%, #7C3AED 100%); 
             -webkit-background-clip: text; 
             -webkit-text-fill-color: transparent; 
-            letter-spacing: 0.12em;
+            letter-spacing: 0.15em;
             margin-bottom: 0;
-            text-shadow: 0px 4px 15px rgba(37, 99, 235, 0.1);">
+            text-shadow: 0px 4px 25px rgba(124, 58, 237, 0.2);">
             DHURANDHAR
         </h1>
-        <h3 style="color: #64748B; font-style: italic; font-weight: 400; margin-top: 0.5rem; margin-bottom: 0.5rem; font-size: 1.2rem;">
+        <h3 style="color: #64748B; font-style: italic; font-weight: 400; margin-top: 0.5rem; margin-bottom: 0.5rem; font-size: 1.4rem;">
             "Ghaflat ki khabar... ya khabar ki ghaflat?"
         </h3>
-        <p style="color: #94A3B8; font-size: 1rem; letter-spacing: 0.1em; font-weight: 600; text-transform: uppercase;">
+        <div style="display: flex; justify-content: center; align-items: center; margin: 1rem 0;">
+            <div style="height: 1px; width: 50px; background: #CBD5E1;"></div>
+            <div style="margin: 0 15px; width: 8px; height: 8px; transform: rotate(45deg); background: #3B82F6;"></div>
+            <div style="height: 1px; width: 50px; background: #CBD5E1;"></div>
+        </div>
+        <p style="color: #475569; font-size: 1.1rem; letter-spacing: 0.15em; font-weight: 600; text-transform: uppercase;">
             AI-Powered Fake News Detection System
         </p>
     </div>
     """, unsafe_allow_html=True)
 
     # --- SIDE-BY-SIDE DASHBOARD LAYOUT ---
-    col1, col2 = st.columns([1, 1.8], gap="large")
+    col1, col2 = st.columns([1, 1.3], gap="large")
 
+    # --- 2. LEFT PANEL (INPUT AREA) ---
     with col1:
-        st.markdown("<h3 style='color: #1E293B; font-weight: 700; font-size: 1.3rem; margin-bottom: 0.5rem;'>📝 Content Source</h3>", unsafe_allow_html=True)
-        st.markdown("<p style='color: #64748B; font-size: 0.95rem; margin-bottom: 1rem;'>Paste a news article snippet or headline below. The system will dispatch it to all available ML agents simultaneously.</p>", unsafe_allow_html=True)
-        
         news_text = st.text_area(
             "News Content:", 
-            height=280, 
-            placeholder="e.g., 'A shocking new report confirms that staring at screens gives you superpowers...'",
+            height=300, 
+            placeholder="Paste or type your news article here...",
             label_visibility="collapsed"
         )
         
         st.markdown("<br>", unsafe_allow_html=True)
-        analyze_btn = st.button("🚀 Run Live Analytics", type="primary", use_container_width=True)
+        analyze_btn = st.button("⚡ PREDICT", use_container_width=True)
+        st.markdown("<p style='text-align: center; color: #94A3B8; font-size: 0.85rem; margin-top: 0.5rem;'>🔒 Your text is used only for prediction.</p>", unsafe_allow_html=True)
 
+    # --- 3. RIGHT PANEL (MODEL SCOREBOARD) ---
     with col2:
-        st.markdown("<h3 style='color: #1E293B; font-weight: 700; font-size: 1.3rem; margin-bottom: 1.5rem;'>📊 Live Agent Analytics</h3>", unsafe_allow_html=True)
-        
         # Placeholders for dynamic content updating
         progress_bar = st.empty()
         status_text = st.empty()
-        table_placeholder = st.empty()
+        scoreboard_placeholder = st.empty()
         metrics_placeholder = st.empty()
         
-        # Initial empty state card
-        if not analyze_btn:
-            table_placeholder.markdown("""
-            <div style="padding: 40px; text-align: center; border: 2px dashed #E2E8F0; border-radius: 12px; background: #F8FAFC;">
-                <h4 style="margin: 0; color: #64748B; font-weight: 600;">System Awaiting Input</h4>
-                <p style="margin-top: 8px; font-size: 0.95rem; color: #94A3B8;">Enter content and launch analytics to view the live multi-model evaluation dashboard.</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-        else:
+        # Action triggered by Predict button
+        if analyze_btn:
             if not news_text.strip():
                 st.error("Text payload empty. Please enter content to proceed.")
-            elif len(news_text.strip()) < 10:
-                st.warning("Payload length insufficient for reliable analysis. Add more text.")
             else:
-                with st.spinner("Dispatching payload to ML engines..."):
+                st.session_state.prediction_results = None # Clear previous
+                with st.spinner("Analyzing article..."):
                     pb = progress_bar.progress(0)
-                    status_text.markdown("<p style='color: #2563EB; font-weight: 600; font-size: 0.95rem;'>Processing real-time evaluation...</p>", unsafe_allow_html=True)
+                    status_text.markdown("<p style='color: #3B82F6; font-weight: 600; font-size: 0.95rem; text-align: center;'>Activating AI Engines...</p>", unsafe_allow_html=True)
                     
-                    total_expected_models = 9
+                    total_expected_models = 5 # KNN, SVM, AdaBoost, XGBoost, Gradient Boosting
                     
                     # DYNAMIC ANIMATION: Loop through the generator as models yield results
                     for i, data in enumerate(predict_all_models(news_text)):
                         
-                        # 1. Increment progress
+                        # Increment progress
                         current_count = i + 1
                         progress_pct = min(100, int((current_count / total_expected_models) * 100))
                         pb.progress(progress_pct)
                         
-                        # 2. Update Table Live
-                        table_html = generate_table_html(data["results"])
-                        table_placeholder.markdown(table_html, unsafe_allow_html=True)
+                        # Save state
+                        st.session_state.prediction_results = data
                         
-                        # 3. Update Metrics Live
-                        metrics_html = generate_metrics_html(data["average_probability"], data["final_label"])
+                        # Update Scoreboard Live
+                        meter_html = generate_meter_html(st.session_state.prediction_results["results"])
+                        scoreboard_placeholder.markdown(meter_html, unsafe_allow_html=True)
+                        
+                        # Update Metrics Live
+                        metrics_html = generate_metrics_html(st.session_state.prediction_results["average_probability"], st.session_state.prediction_results["final_label"])
                         metrics_placeholder.markdown(metrics_html, unsafe_allow_html=True)
                         
-                        # Small UI delay to make the sequential cascade feel premium and readable
-                        time.sleep(0.4)
+                        # Smooth animation delay
+                        time.sleep(0.5)
                         
                     # Clean up statuses upon finish
                     status_text.empty()
                     progress_bar.empty()
-                    st.success("Analysis complete. Multi-model consensus reached.")
+
+        # Render persisted results if not actively predicting
+        if st.session_state.prediction_results is not None and not analyze_btn:
+            data = st.session_state.prediction_results
+            meter_html = generate_meter_html(data["results"])
+            scoreboard_placeholder.markdown(meter_html, unsafe_allow_html=True)
+            
+            metrics_html = generate_metrics_html(data["average_probability"], data["final_label"])
+            metrics_placeholder.markdown(metrics_html, unsafe_allow_html=True)
+            
+        elif st.session_state.prediction_results is None and not analyze_btn:
+            # Initial empty state card
+            scoreboard_placeholder.markdown("""
+            <div style="padding: 60px 40px; text-align: center; border: 1px solid #E2E8F0; border-radius: 16px; background: #FFFFFF; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+                <div style="width: 48px; height: 48px; margin: 0 auto 16px auto; background: #F8FAFC; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                    <span style="font-size: 24px;">📊</span>
+                </div>
+                <h4 style="margin: 0; color: #1E293B; font-weight: 700; font-size: 1.2rem;">Model Scoreboard</h4>
+                <p style="margin-top: 8px; font-size: 0.95rem; color: #64748B;">Enter text and click predict to see live AI analysis.</p>
+            </div>
+            """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
