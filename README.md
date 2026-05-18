@@ -104,6 +104,7 @@ FAKE-NEWS-DETECTION/
 ├── poster/
 ├── presentation/
 ├── screenshots/
+├── research_paper/
 │
 └── README.md
 ```
