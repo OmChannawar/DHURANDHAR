@@ -205,6 +205,9 @@ def main():
             <div style="margin: 0 15px; width: 8px; height: 8px; transform: rotate(45deg); background: #3B82F6;"></div>
             <div style="height: 1px; width: 50px; background: #CBD5E1;"></div>
         </div>
+        <p style="color: #475569; font-size: 1.1rem; letter-spacing: 0.15em; font-weight: 600; text-transform: uppercase;">
+            Fake News Detection System
+        </p>
     </div>
     """, unsafe_allow_html=True)
 
