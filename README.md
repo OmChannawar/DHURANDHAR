@@ -85,30 +85,27 @@ FAKE-NEWS-DETECTION/
 │
 ├── deployment/
 │   ├── app.py
+│   ├── ml_backend.py
 │   └── requirements.txt
 │
 ├── models/
+│   ├── knn_model.pkl
+│   ├── svm_model.pkl
+│   ├── adaboost_model.pkl
+│   └── xgboost_model.pkl
 │
 ├── notebooks/
 │   ├── 01_data_preprocessing.ipynb
-│   ├── 02_logistic_regression.ipynb
-│   ├── 03_knn.ipynb
-│   ├── 04_random_forest.ipynb
-│   ├── 05_svm.ipynb
-│   ├── 06_decision_tree.ipynb
-│   ├── 07_naive_bayes.ipynb
-│   ├── 08_adaboost.ipynb
-│   ├── 09_gradient_boosting.ipynb
-│   ├── 10_xgboost.ipynb
-│   └── 11_model_analysis.ipynb
+│   ├── 02_knn.ipynb
+│   ├── 03_svm.ipynb
+│   ├── 04_adaboost.ipynb
+│   └── 05_xgboost.ipynb
 │
 ├── poster/
 ├── presentation/
-├── report/
 ├── screenshots/
 │
-├── README.md
-└── requirements.txt
+└── README.md
 ```
 
 ---
