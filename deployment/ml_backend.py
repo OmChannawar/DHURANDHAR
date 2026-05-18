@@ -1,6 +1,15 @@
 import os
+import sys
 import joblib
 import numpy as np
+
+# Add parent directory to path so we can import
+# the NLPPreprocessor class used inside the pipelines.
+# Without this, joblib cannot unpickle the models.
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), ".."
+))
+from nlp_preprocessor import NLPPreprocessor  # noqa: E402, F401
 
 
 # -------------------------------

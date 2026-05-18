@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import time
 from ml_backend import predict_all_models
 
@@ -56,13 +57,21 @@ st.markdown("""
         transform: translateY(-2px) !important;
         box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4) !important;
     }
+
+    /* Hide iframe borders from components.html */
+    iframe {
+        border: none !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
 
 # --- UI Helper Functions ---
 def generate_meter_html(results):
-    html = '<div style="display: flex; flex-direction: column; gap: 1rem;">'
+    """Generate a full HTML page with SVG gauges for model results.
+    Uses components.html() so SVG elements render correctly."""
+    
+    cards_html = ""
     for r in results:
         prob = r['probability']
         label = r['label']
@@ -70,20 +79,20 @@ def generate_meter_html(results):
         
         # Color logic
         if label == "Real":
-            color = "#16A34A" # Green for real
+            color = "#16A34A"
         elif label == "Fake":
-            color = "#DC2626" # Red for fake
+            color = "#DC2626"
         else:
             color = "#64748B"
             
         # Override for moderate confidence
         if 40 <= prob < 75:
-            color = "#F59E0B" # Orange
+            color = "#F59E0B"
             
         dash_array = 125.6
         dash_offset = dash_array - (dash_array * prob / 100)
         
-        html += f"""
+        cards_html += f"""
         <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); display: flex; align-items: center; justify-content: space-between;">
             <div>
                 <h4 style="margin: 0; color: #1E293B; font-size: 1.1rem; font-weight: 700;">{model}</h4>
@@ -98,11 +107,32 @@ def generate_meter_html(results):
             </div>
         </div>
         """
-    html += '</div>'
-    return html
+
+    # Calculate total height based on number of cards
+    # Each card is roughly 90px + 16px gap
+    total_height = len(results) * 106 + 20
+
+    html = f"""
+    <html>
+    <head>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+        <style>
+            * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+            body {{ font-family: 'Inter', sans-serif; background: transparent; }}
+        </style>
+    </head>
+    <body>
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+            {cards_html}
+        </div>
+    </body>
+    </html>
+    """
+    return html, total_height
 
 
 def generate_metrics_html(avg_prob, final_label):
+    """Generate metrics summary HTML."""
     if final_label == "Real":
         color = "#16A34A"
         bg = "#F0FDF4"
@@ -116,18 +146,30 @@ def generate_metrics_html(avg_prob, final_label):
         bg = "#F8FAFC"
         border = "#E2E8F0"
 
-    return f"""
-    <div style="display: flex; gap: 20px; margin-top: 1.5rem;">
-        <div style="flex: 1; padding: 20px; background: #FFFFFF; border-radius: 12px; border: 1px solid #E2E8F0; text-align: center; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
-            <div style="color: #64748B; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Average Confidence</div>
-            <div style="color: #1E293B; font-size: 2rem; font-weight: 800; margin-top: 4px;">{avg_prob:.1f}%</div>
+    html = f"""
+    <html>
+    <head>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+        <style>
+            * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+            body {{ font-family: 'Inter', sans-serif; background: transparent; }}
+        </style>
+    </head>
+    <body>
+        <div style="display: flex; gap: 20px; margin-top: 1.5rem;">
+            <div style="flex: 1; padding: 20px; background: #FFFFFF; border-radius: 12px; border: 1px solid #E2E8F0; text-align: center; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+                <div style="color: #64748B; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Average Confidence</div>
+                <div style="color: #1E293B; font-size: 2rem; font-weight: 800; margin-top: 4px;">{avg_prob:.1f}%</div>
+            </div>
+            <div style="flex: 1; padding: 20px; background: {bg}; border-radius: 12px; border: 1px solid {border}; text-align: center; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+                <div style="color: {color}; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Final Prediction</div>
+                <div style="color: {color}; font-size: 2rem; font-weight: 900; margin-top: 4px;">{final_label.upper()} NEWS</div>
+            </div>
         </div>
-        <div style="flex: 1; padding: 20px; background: {bg}; border-radius: 12px; border: 1px solid {border}; text-align: center; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
-            <div style="color: {color}; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Final Prediction</div>
-            <div style="color: {color}; font-size: 2rem; font-weight: 900; margin-top: 4px;">{final_label.upper()} NEWS</div>
-        </div>
-    </div>
+    </body>
+    </html>
     """
+    return html
 
 
 def main():
@@ -213,32 +255,23 @@ def main():
     # --- 3. RIGHT PANEL (MODEL SCOREBOARD) ---
     with right_col:
 
-        # Persistent placeholders
-        scoreboard_placeholder = st.empty()
-        metrics_placeholder = st.empty()
-        progress_placeholder = st.empty()
-        status_placeholder = st.empty()
-
         # --------------------------
         # ACTIVE ANALYSIS STATE
         # --------------------------
         if st.session_state.is_analyzing:
 
-            progress_bar = progress_placeholder.progress(0)
+            progress_bar = st.progress(0)
 
-            status_placeholder.markdown(
-                """
-                <div style="
-                    text-align:center;
-                    color:#3B82F6;
-                    font-weight:600;
-                    margin-bottom:15px;
-                ">
-                🤖 Activating AI Engines...
-                </div>
-                """,
+            status_msg = st.empty()
+            status_msg.markdown(
+                '<div style="text-align:center; color:#3B82F6; font-weight:600; margin-bottom:15px;">'
+                '🤖 Activating AI Engines...'
+                '</div>',
                 unsafe_allow_html=True
             )
+
+            scoreboard_area = st.empty()
+            metrics_area = st.empty()
 
             total_models = 5
 
@@ -258,28 +291,28 @@ def main():
 
                 progress_bar.progress(progress)
 
-                # IMPORTANT:
-                # render into placeholders
-                scoreboard_placeholder.markdown(
-                    generate_meter_html(
-                        data["results"]
-                    ),
-                    unsafe_allow_html=True
+                # Render scoreboard using components.html
+                meter_html, meter_height = generate_meter_html(
+                    data["results"]
                 )
+                scoreboard_area.empty()
+                with scoreboard_area.container():
+                    components.html(meter_html, height=meter_height, scrolling=False)
 
-                metrics_placeholder.markdown(
-                    generate_metrics_html(
-                        data["average_probability"],
-                        data["final_label"]
-                    ),
-                    unsafe_allow_html=True
+                # Render metrics using components.html
+                metrics_html = generate_metrics_html(
+                    data["average_probability"],
+                    data["final_label"]
                 )
+                metrics_area.empty()
+                with metrics_area.container():
+                    components.html(metrics_html, height=120, scrolling=False)
 
                 time.sleep(0.5)
 
             # cleanup
-            progress_placeholder.empty()
-            status_placeholder.empty()
+            progress_bar.empty()
+            status_msg.empty()
 
             st.session_state.is_analyzing = False
             st.rerun()
@@ -293,62 +326,44 @@ def main():
                 st.session_state.prediction_results
             )
 
-            scoreboard_placeholder.markdown(
-                generate_meter_html(
-                    data["results"]
-                ),
-                unsafe_allow_html=True
+            meter_html, meter_height = generate_meter_html(
+                data["results"]
             )
+            components.html(meter_html, height=meter_height, scrolling=False)
 
-            metrics_placeholder.markdown(
-                generate_metrics_html(
-                    data["average_probability"],
-                    data["final_label"]
-                ),
-                unsafe_allow_html=True
+            metrics_html = generate_metrics_html(
+                data["average_probability"],
+                data["final_label"]
             )
+            components.html(metrics_html, height=120, scrolling=False)
 
         # --------------------------
         # EMPTY STATE
         # --------------------------
         else:
 
-            scoreboard_placeholder.markdown(
+            components.html(
                 """
-                <div style="
-                    padding:60px;
-                    border:1px solid #E2E8F0;
-                    border-radius:20px;
-                    text-align:center;
-                    background:white;
-                    box-shadow:
-                    0 4px 12px
-                    rgba(0,0,0,0.06);
-                ">
-                <div style="
-                    font-size:40px;
-                    margin-bottom:10px;
-                ">
-                    📊
-                </div>
-
-                <h3 style="
-                    color:#0F172A;
-                    margin-bottom:8px;
-                ">
-                    Model Scoreboard
-                </h3>
-
-                <p style="
-                    color:#64748B;
-                ">
-                    Prediction scoreboard
-                    will appear here
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+                <html>
+                <head>
+                    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+                    <style>
+                        * { margin: 0; padding: 0; box-sizing: border-box; }
+                        body { font-family: 'Inter', sans-serif; background: transparent; }
+                    </style>
+                </head>
+                <body>
+                    <div style="padding:60px; border:1px solid #E2E8F0; border-radius:20px; text-align:center; background:white; box-shadow:0 4px 12px rgba(0,0,0,0.06);">
+                        <div style="font-size:40px; margin-bottom:10px;">📊</div>
+                        <h3 style="color:#0F172A; margin-bottom:8px;">Model Scoreboard</h3>
+                        <p style="color:#64748B;">Prediction scoreboard will appear here</p>
+                    </div>
+                </body>
+                </html>
+                """,
+                height=250,
+                scrolling=False
+            )
 
 if __name__ == "__main__":
     main()
